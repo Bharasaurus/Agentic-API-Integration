@@ -1,0 +1,13 @@
+API JSON Doc
+   ↓
+Parser + Normalizer
+   ↓
+Vector Store (API Knowledge)
+   ↓
+RAG-powered LLM
+   ↓
+Code Generator
+   ↓
+Compiler / Validator
+   ↓
+Spring Boot Project
