@@ -1,0 +1,19 @@
+{
+  "serviceName": "UserService",
+  "baseUrl": "https://api.example.com",
+  "auth": "bearer",
+  "endpoints": [
+    {
+      "name": "getUsers",
+      "method": "GET",
+      "path": "/users",
+      "response": "User[]"
+    },
+    {
+      "name": "getUserById",
+      "method": "GET",
+      "path": "/users/{id}",
+      "response": "User"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+- Use Spring Boot 3
+- Java version 17
+- Use WebClient, not RestTemplate
+- One client class per service
+- DTOs must be POJOs
+- No hardcoded secrets
+- WebClient must be configured as a Bean
+- Use constructor injection
+- Base URL must be configurable
+- Use package com.generated.client
