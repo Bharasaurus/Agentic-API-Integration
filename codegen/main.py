@@ -12,7 +12,13 @@ def choose_language():
 
 def main():
     vectorstore = build_vectorstore()
-    endpoints = extract_endpoints("input/api.json")
+
+    # allow the user to specify either a local file or an HTTP endpoint
+    spec_source = input("Path or URL of API spec [input/api.json]: ").strip()
+    if not spec_source:
+        spec_source = "input/api.json"
+
+    endpoints = extract_endpoints(spec_source)
 
     language = choose_language()
 

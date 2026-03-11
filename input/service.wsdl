@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<definitions xmlns="http://schemas.xmlsoap.org/wsdl/" 
+             xmlns:tns="http://example.com/">
+  <portType name="TestPort">
+    <operation name="DoSomething"/>
+    <operation name="DoAnotherThing"/>
+  </portType>
+</definitions>

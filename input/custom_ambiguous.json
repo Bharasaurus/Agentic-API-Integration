@@ -1,0 +1,8 @@
+{
+  "endpoints": [
+    {
+      "path": "/ambiguous",
+      "name": "ambiguousEndpoint"
+    }
+  ]
+}

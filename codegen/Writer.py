@@ -8,6 +8,22 @@ EXPECTED_FILES = {
     "UserServiceDto.java",
 }
 
+
+def _strip_markdown_fences(content: str, language: str) -> str:
+    """Remove markdown code fences (triple backticks) and language markers.
+    
+    Handles formats like:
+    - ```python\ncode\n```
+    - ```java\ncode\n```
+    - ```\ncode\n```
+    """
+    # Remove opening fence with optional language tag
+    content = re.sub(r'^```(?:python|java|py|js)?\s*\n?', '', content, flags=re.MULTILINE)
+    # Remove closing fence
+    content = re.sub(r'\n?```\s*$', '', content, flags=re.MULTILINE)
+    return content.strip()
+
+
 def write_java_files(llm_output: str, language: str = "java"):
     output_dir = Path("output/generated")
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -24,12 +40,33 @@ def write_java_files(llm_output: str, language: str = "java"):
     if files:
         for filename, content in files:
             filename = filename.strip()
-            # ensure extension matches language
-            if language.lower() == "python" and not filename.lower().endswith(".py"):
-                filename = filename + ".py"
-            if language.lower() == "java" and not filename.lower().endswith(".java"):
-                filename = filename + ".java"
+            # extract just the filename part (before any space or special char that looks like explanation)
+            filename = filename.split()[0]  # take only the first token
+            # sanitize: remove angle brackets, backticks, parentheses, and other invalid chars
+            filename = re.sub(r'[<>:"|?*\(\)`]', '', filename).strip()
+            
+            if not filename:
+                continue  # skip if filename became empty after sanitization
+            
+            # skip files with wrong extensions (e.g., .java files when generating python)
+            if language.lower() == "python":
+                if filename.lower().endswith(".java"):
+                    continue  # skip Java files in Python mode
+                if not filename.lower().endswith(".py"):
+                    filename = filename + ".py"
+            elif language.lower() == "java":
+                if filename.lower().endswith(".py"):
+                    # strip .py and add .java if it ends with .java.py
+                    if filename.lower().endswith(".java.py"):
+                        filename = filename[:-3]  # remove .py, keep .java
+                    elif not filename.lower().endswith(".java"):
+                        filename = filename + ".java"
+                elif not filename.lower().endswith(".java"):
+                    filename = filename + ".java"
 
+            # strip markdown code fences if present
+            content = _strip_markdown_fences(content, language)
+            
             target = output_dir / filename
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content.strip(), encoding="utf-8")
@@ -42,6 +79,9 @@ def write_java_files(llm_output: str, language: str = "java"):
 
         for i, m in enumerate(matches):
             code = m.group(1).strip()
+            # Remove any stray markdown fences that might be in the captured group
+            code = _strip_markdown_fences(code, language)
+            
             # Search backwards from the code block for a filename in backticks or plain path
             prefix = llm_output[max(0, m.start() - 300): m.start()]
             if language.lower() == "python":

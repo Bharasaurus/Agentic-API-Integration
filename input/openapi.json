@@ -1,0 +1,35 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Sample API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/pets": {
+      "get": {
+        "summary": "List pets",
+        "responses": {
+          "200": {
+            "description": "A paged array of pets",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "type": "string" } }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a pet",
+        "requestBody": {
+          "content": {
+            "application/json": { "schema": { "type": "string" } }
+          }
+        },
+        "responses": {
+          "201": { "description": "Pet created" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,23 @@
+- Use FastAPI 0.104+
+- Python version 3.11+
+- Use httpx for async HTTP requests, not requests
+- One client class per service
+- Request/Response models must use Pydantic v2
+- No hardcoded secrets; use environment variables
+- HTTP client must be configured as a dependency injection provider
+- Use dependency injection for all external services
+- Base URL must be configurable via environment or config
+- Use async/await for all route handlers and client calls
+- Type hints are mandatory on all functions and models
+- Use APIRouter for modular endpoint organization
+- Error handling must return appropriate HTTP status codes
+- Include validation with Pydantic validators
+- Use middleware for common concerns (logging, auth)
+- NEVER generate repository layer unless spec defines database schema.
+- Production ready
+- Follow clean architecture
+- Include validation and error handling
+- No hallucinated information, only use the provided endpoint details
+- No placeholder implementations
+- No explanation, direct code
+- The service layer should have logic, and all the layers should have connections

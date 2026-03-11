@@ -9,6 +9,7 @@ def generate_code(endpoint, vectorstore, language: str = "java"):
     Generate backend code for:
     Path: {endpoint['path']}
     Method: {endpoint['method']}
+    Language: {language.upper()}
     """
 
     # retrieve contextual docs
@@ -17,7 +18,8 @@ def generate_code(endpoint, vectorstore, language: str = "java"):
 
     # language-specific instructions
     if language.lower() == "python":
-        lang_block = """
+        lang_block = """**IMPORTANT: GENERATE PYTHON CODE ONLY. DO NOT GENERATE JAVA CODE.**
+
 Target: FastAPI (Python 3.11+)
 - Produce Pydantic models for requests/responses.
 - Produce async route functions using APIRouter.
@@ -26,9 +28,10 @@ Target: FastAPI (Python 3.11+)
 - Provide a `requirements.txt` and a minimal `app.py` startup snippet.
 """
     else:
-        lang_block = """
+        lang_block = """**IMPORTANT: GENERATE JAVA CODE ONLY. DO NOT GENERATE PYTHON CODE.**
+
 Target: Spring Boot (Java 17)
-- Produce Controllers, DTOs, Service and WebClient configuration as before.
+- Produce Controllers, DTOs, Service and WebClient configuration.
 - Include `// File: <path>` markers before each file OR fenced ```java``` blocks.
 """
 
@@ -36,7 +39,8 @@ Target: Spring Boot (Java 17)
 Use the following coding standards and templates:
 {context}
 
-Now generate production-ready code for this endpoint.
+Now generate production-ready {language.upper()} code for this endpoint ONLY.
+Do NOT include code in any other language.
 
 Endpoint:
 Path: {endpoint['path']}
@@ -47,7 +51,8 @@ Responses: {endpoint['responses']}
 Requirements:
 - Proper validation and type hints
 - Error handling and sensible HTTP status mapping
-- Clear filenames (use `# File:` or `// File:` markers) or fenced code blocks
+- Clear filenames (use `# File:` or `// File:` markers)
+- {language.upper()} code ONLY
 """
 
     return call_llm(prompt)
