@@ -1,7 +1,7 @@
 from LLM_Integration import call_llm
 
 
-def generate_code(endpoint, vectorstore, language: str = "java"):
+def generate_code(endpoint, vectorstore, language: str = "python"):
 
     retriever = vectorstore.as_retriever(search_kwargs={"k": 4})
 
@@ -12,47 +12,82 @@ def generate_code(endpoint, vectorstore, language: str = "java"):
     Language: {language.upper()}
     """
 
-    # retrieve contextual docs
     docs = retriever.get_relevant_documents(query)
+
     context = "\n\n".join([doc.page_content for doc in docs])
 
-    # language-specific instructions
+    # Detect SOAP endpoint
+    is_soap = endpoint["method"] == "SOAP"
+
     if language.lower() == "python":
-        lang_block = """**IMPORTANT: GENERATE PYTHON CODE ONLY. DO NOT GENERATE JAVA CODE.**
+
+        lang_block = """IMPORTANT: GENERATE PYTHON CODE ONLY.
 
 Target: FastAPI (Python 3.11+)
-- Produce Pydantic models for requests/responses.
-- Produce async route functions using APIRouter.
-- Use `httpx` for HTTP clients and dependency injection for the client.
-- Include `# File: <path>` markers before each file OR fenced ```python``` code blocks.
-- Provide a `requirements.txt` and a minimal `app.py` startup snippet.
+
+- Use layered architecture
+- routers/
+- services/
+- clients/
+- schemas/
+
+Use Pydantic models
+Use async FastAPI routes
 """
+
     else:
-        lang_block = """**IMPORTANT: GENERATE JAVA CODE ONLY. DO NOT GENERATE PYTHON CODE.**
 
-Target: Spring Boot (Java 17)
-- Produce Controllers, DTOs, Service and WebClient configuration.
-- Include `// File: <path>` markers before each file OR fenced ```java``` blocks.
+        lang_block = """IMPORTANT: GENERATE JAVA CODE ONLY.
+
+Target: Spring Boot
+Generate controllers, services and DTOs.
 """
 
-    prompt = f"""{lang_block}
-Use the following coding standards and templates:
+    # SOAP specific instructions
+    protocol_block = ""
+
+    if is_soap:
+
+        protocol_block = """
+SOAP INTEGRATION REQUIREMENTS:
+
+- Use Zeep library
+- Create SOAP client in clients/soap_client.py
+- Initialize client using WSDL
+- Call SOAP operation using client.service.<operation>
+- Wrap SOAP call inside service layer
+- Expose REST endpoint that internally calls SOAP service
+"""
+
+    prompt = f"""
+{lang_block}
+
+{protocol_block}
+
+Use the following coding standards:
 {context}
 
-Now generate production-ready {language.upper()} code for this endpoint ONLY.
-Do NOT include code in any other language.
+Generate production-ready backend code.
 
-Endpoint:
+Endpoint Information:
+
 Path: {endpoint['path']}
 Method: {endpoint['method']}
 RequestBody: {endpoint['requestBody']}
 Responses: {endpoint['responses']}
 
 Requirements:
-- Proper validation and type hints
-- Error handling and sensible HTTP status mapping
-- Clear filenames (use `# File:` or `// File:` markers)
-- {language.upper()} code ONLY
+
+- Clean layered architecture
+- Proper validation
+- Error handling
+- File structure with markers:
+
+# File: routers/...
+# File: services/...
+# File: clients/...
+
+Generate only {language.upper()} code.
 """
 
     return call_llm(prompt)

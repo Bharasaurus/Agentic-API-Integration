@@ -1,18 +1,22 @@
 import json
-import os
 from enum import Enum
 from dataclasses import dataclass, asdict
 
 try:
-    # requests is only required when fetching a spec from a URL
     import requests
-except ImportError:  # pragma: no cover - requests may not be installed by default
+except ImportError:
     requests = None
 
+# NEW: SOAP library
+try:
+    from zeep import Client
+except ImportError:
+    Client = None
 
 
 class Format(Enum):
     OPENAPI = "openapi"
+    SOAP = "soap"
 
 
 @dataclass
@@ -26,81 +30,74 @@ class UniversalEndpoint:
         return asdict(self)
 
 
-# helper loaders ------------------------------------------------------------
+# ---------------- SOURCE LOADER ----------------
 
 def _load_source(source):
-    """Return either a dict (parsed JSON) or a raw string.
-
-    The caller can pass a dict, a filesystem path, or an http(s) URL.  If the
-    content is JSON it will be parsed; otherwise the raw text is returned.  An
-    exception is raised when the underlying fetch fails.
-    """
 
     if isinstance(source, dict):
         return source
 
-    # fetch remote if necessary
     if isinstance(source, str) and source.lower().startswith("http"):
         if requests is None:
-            raise RuntimeError("requests package is required to fetch a spec from a URL")
+            raise RuntimeError("requests package is required")
+
         resp = requests.get(source)
         resp.raise_for_status()
+
         text = resp.text
         try:
             return resp.json()
         except ValueError:
             return text
 
-    # otherwise treat as file path
     with open(source, "r", encoding="utf-8") as f:
         text = f.read()
+
     try:
         return json.loads(text)
-    except ValueError:  # not JSON, return raw
+    except ValueError:
         return text
 
 
-# format detection ---------------------------------------------------------
+# ---------------- FORMAT DETECTION ----------------
 
-def detect_format(source) -> Format:
-    """Determine if the provided spec is OpenAPI.
-
-    We no longer support custom or WSDL formats – anything that does not
-    look like OpenAPI is considered invalid and will trigger an error early.
-    """
+def detect_format(source):
 
     spec = _load_source(source)
 
-    # dict-based heuristic
+    # Detect OpenAPI
     if isinstance(spec, dict):
         if "paths" in spec or "openapi" in spec or "swagger" in spec:
             return Format.OPENAPI
-    # try parsing string as JSON in case we were given raw text
-    if isinstance(spec, str):
-        try:
-            j = json.loads(spec)
-            if "paths" in j or "openapi" in j or "swagger" in j:
-                return Format.OPENAPI
-        except ValueError:
-            pass
 
-    raise ValueError("Only OpenAPI/Swagger specs are supported")
+    # Detect WSDL (SOAP)
+    if isinstance(source, str) and source.endswith(".wsdl"):
+        return Format.SOAP
+
+    if isinstance(spec, str) and "<definitions" in spec:
+        return Format.SOAP
+
+    raise ValueError("Unsupported API specification format")
 
 
-# parsers ------------------------------------------------------------------
+# ---------------- OPENAPI PARSER ----------------
 
 class OpenAPIParser:
+
     @staticmethod
-    def parse(source) -> list[UniversalEndpoint]:
-        """Parse an OpenAPI / Swagger document into a list of endpoints."""
+    def parse(source):
 
         spec = _load_source(source)
+
         if isinstance(spec, str):
             spec = json.loads(spec)
 
         endpoints = []
+
         for path, methods in spec.get("paths", {}).items():
+
             for method, details in methods.items():
+
                 endpoints.append(
                     UniversalEndpoint(
                         path=path,
@@ -109,57 +106,92 @@ class OpenAPIParser:
                         responses=details.get("responses"),
                     )
                 )
+
         return endpoints
 
 
-# validation & enrichment --------------------------------------------------
+# ---------------- SOAP PARSER ----------------
 
-def validate(endpoints: list[UniversalEndpoint]) -> list[UniversalEndpoint]:
-    """Catch missing or malformed fields early in the process."""
+class SOAPParser:
+
+    @staticmethod
+    def parse(wsdl_path):
+
+        if Client is None:
+            raise RuntimeError("zeep library required for SOAP parsing")
+
+        client = Client(wsdl_path)
+
+        endpoints = []
+
+        for service in client.wsdl.services.values():
+
+            for port in service.ports.values():
+
+                operations = port.binding._operations
+
+                for op_name in operations.keys():
+
+                    endpoints.append(
+                        UniversalEndpoint(
+                            path=op_name,
+                            method="SOAP",
+                            requestBody={},
+                            responses={}
+                        )
+                    )
+
+        return endpoints
+
+
+# ---------------- VALIDATION ----------------
+
+def validate(endpoints):
 
     for ep in endpoints:
-        if not ep.path or not isinstance(ep.path, str):
-            raise ValueError(f"Endpoint has invalid path: {ep}")
-        if not ep.method or not isinstance(ep.method, str):
-            raise ValueError(f"Endpoint has invalid method: {ep}")
+
+        if not ep.path:
+            raise ValueError(f"Invalid path: {ep}")
+
+        if not ep.method:
+            raise ValueError(f"Invalid method: {ep}")
+
         ep.method = ep.method.upper()
+
     return endpoints
 
 
-def enrich(endpoints: list[UniversalEndpoint]) -> list[UniversalEndpoint]:
-    """Infer sensible defaults and normalise the IR before handing it off.
+# ---------------- ENRICHMENT ----------------
 
-    Currently this simply ensures that ``requestBody`` and ``responses`` are
-    never ``None``; other conventions could be added here (e.g. filling in
-    common HTTP status codes or parameter names).
-    """
+def enrich(endpoints):
 
     for ep in endpoints:
+
         if ep.requestBody is None:
             ep.requestBody = {}
+
         if ep.responses is None:
             ep.responses = {}
+
     return endpoints
 
 
-# public entrypoint --------------------------------------------------------
+# ---------------- MAIN ENTRYPOINT ----------------
 
 def extract_endpoints(source):
-    """Load a spec from a path/URL/dict and return normalized endpoint dicts.
-
-    The function dispatches to the appropriate parser based on a simple
-    format detection step, then validates and enriches the resulting
-    intermediate representation (IR).  The output is a list of plain dicts so
-    existing callers (such as ``main.py``) continue to work unchanged.
-    """
 
     fmt = detect_format(source)
+
     if fmt == Format.OPENAPI:
         eps = OpenAPIParser.parse(source)
-    else:  # defensive – should not happen
+
+    elif fmt == Format.SOAP:
+        eps = SOAPParser.parse(source)
+
+    else:
         raise ValueError(f"Unhandled format {fmt}")
 
     eps = validate(eps)
     eps = enrich(eps)
-    # convert to plain dictionaries for backwards compatibility
+
     return [ep.to_dict() for ep in eps]
