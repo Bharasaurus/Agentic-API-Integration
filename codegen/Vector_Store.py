@@ -1,14 +1,23 @@
 import os
 from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+# Define base path once (global)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+KNOWLEDGE_PATH = os.path.join(BASE_DIR, "knowledge")
 
 def load_knowledge():
     docs = []
-    for file in os.listdir("knowledge"):
-        with open(f"knowledge/{file}", "r") as f:
+
+    for file in os.listdir(KNOWLEDGE_PATH):
+        file_path = os.path.join(KNOWLEDGE_PATH, file)
+
+        with open(file_path, "r") as f:
             docs.append(f.read())
+
     return docs
+
 
 def build_vectorstore():
     documents = load_knowledge()

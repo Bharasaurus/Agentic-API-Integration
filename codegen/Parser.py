@@ -128,13 +128,13 @@ class SOAPParser:
 
             for port in service.ports.values():
 
-                operations = port.binding._operations
+                operations = port.binding._operations.values()
 
-                for op_name in operations.keys():
+                for op in operations:
 
                     endpoints.append(
                         UniversalEndpoint(
-                            path=op_name,
+                            path=op.name,
                             method="SOAP",
                             requestBody={},
                             responses={}
@@ -142,7 +142,6 @@ class SOAPParser:
                     )
 
         return endpoints
-
 
 # ---------------- VALIDATION ----------------
 

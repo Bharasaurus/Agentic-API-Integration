@@ -30,5 +30,3 @@ class LoggingMiddleware:
             f"{request.method} {request.url.path} - {response.status_code} "
             f"completed in {process_time:.2f}ms"
         )
-
-'''''''''
